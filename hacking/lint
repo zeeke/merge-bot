@@ -1,6 +1,7 @@
 #!/bin/sh
 
-lint_args="--check --diff"
+format_args="--check --diff"
+check_args="--diff"
 
 usage() {
     echo "Usage: $0 [-r | --reformat]"
@@ -18,9 +19,17 @@ eval set -- "$PARSED_ARGS"
 while :
 do
     case $1 in
-        -r | --reformat) lint_args=""; shift ;;
-        --) shift; break;;
+        -r | --reformat)
+            check_args="--fix --unsafe-fixes"
+            format_args=""
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
     esac
 done
 
-black $lint_args .
+ruff check --no-cache $check_args .
+ruff format --no-cache $format_args .

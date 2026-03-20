@@ -5,7 +5,6 @@ from git import Repo
 from . import cli
 from . import merge_bot
 
-
 valid_args = {
     "source": "https://opendev.org/openstack/kuryr-kubernetes:master",
     "dest": "openshift/kuryr-kubernetes:master",
