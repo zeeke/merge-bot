@@ -13,7 +13,7 @@
 ## Requirements
 
 - Python 3.8 or higher
-- Access to GitHub App credentials
+- Access to GitHub App credentials or a Personal Access Token
 - Optional: Slack webhook credentials for notifications
 
 ## Installation
@@ -30,10 +30,17 @@ pip install -r requirements.txt
 
 `merge-bot` provides several CLI options to customize its behavior. Below is the general usage syntax:
 
+Using GitHub App credentials:
 ```bash
 python merge-bot.py --source <source_repo:branch> --dest <dest_repo:branch> --merge <merge_branch> \
     --bot-name <bot_name> --bot-email <bot_email> --github-app-key <app_key_path> \
     --github-cloner-key <cloner_key_path> [options]
+```
+
+Using a Personal Access Token:
+```bash
+python merge-bot.py --source <source_repo:branch> --dest <dest_repo:branch> --merge <merge_branch> \
+    --bot-name <bot_name> --bot-email <bot_email> --github-token <token_path> [options]
 ```
 
 ### CLI Options
@@ -46,13 +53,16 @@ python merge-bot.py --source <source_repo:branch> --dest <dest_repo:branch> --me
 | `--bot-name`           |       | Yes      | The name used in git commits.                                                                                                                             |
 | `--bot-email`          |       | Yes      | The email used in git commits.                                                                                                                            |
 | `--working-dir`        |       | No       | The directory where repositories will be cloned. Defaults to `.`.                                                                                         |
+| `--github-token`       |       | No*      | The path to a file containing a GitHub Personal Access Token. Alternative to GitHub App auth.                                                              |
 | `--github-app-id`      |       | No       | The GitHub App ID. Defaults to `118774`.                                                                                                                  |
-| `--github-app-key`     |       | Yes      | The path to the GitHub App private key.                                                                                                                   |
+| `--github-app-key`     |       | No*      | The path to the GitHub App private key.                                                                                                                   |
 | `--github-cloner-id`   |       | No       | The GitHub cloner App ID. Defaults to `121614`.                                                                                                           |
-| `--github-cloner-key`  |       | Yes      | The path to the GitHub cloner App private key.                                                                                                            |
+| `--github-cloner-key`  |       | No*      | The path to the GitHub cloner App private key.                                                                                                            |
 | `--slack-webhook`      |       | No       | Path to Slack webhook credentials for notifications.                                                                                                      |
 | `--update-go-modules`  |       | No       | Update and vendor Go modules in a separate commit.                                                                                                        |
 | `--run-make`           |       | No       | Run `make merge-bot` and include changes in a separate commit.                                                                                           |
+
+\* Either `--github-token` or both `--github-app-key` and `--github-cloner-key` must be provided.
 
 ### Examples
 
@@ -70,7 +80,13 @@ python merge-bot.py --source <source_repo:branch> --dest <dest_repo:branch> --me
        --github-cloner-key /path/to/cloner.key --update-go-modules
    ```
 
-3. **Merge and Run `make`**:
+3. **Basic Merge with Personal Access Token**:
+   ```bash
+   python merge-bot.py --source https://example.com/upstream.git:main --dest my-org/my-repo:dev --merge my-org/my-repo:merge \
+       --bot-name "Merge Bot" --bot-email "bot@example.com" --github-token /path/to/token
+   ```
+
+4. **Merge and Run `make`**:
    ```bash
    python merge-bot.py --source https://example.com/upstream.git:main --dest my-org/my-repo:dev --merge my-org/my-repo:merge \
        --bot-name "Merge Bot" --bot-email "bot@example.com" --github-app-key /path/to/app.key \

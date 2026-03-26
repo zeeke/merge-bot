@@ -20,6 +20,19 @@ valid_args = {
     "run-make": None,
 }
 
+valid_token_args = {
+    "source": "https://opendev.org/openstack/kuryr-kubernetes:master",
+    "dest": "openshift/kuryr-kubernetes:master",
+    "merge": "shiftstack/kuryr-kubernetes:merge-bot-master",
+    "bot-name": "test",
+    "bot-email": "test@email.com",
+    "working-dir": "tmp",
+    "github-token": "/credentials/gh-token",
+    "slack-webhook": "/credentials/slack-webhook",
+    "update-go-modules": None,
+    "run-make": None,
+}
+
 
 def args_dict_to_list(args_dict):
     args = []
@@ -76,6 +89,34 @@ class test_cli(unittest.TestCase):
         self.assertEqual(args.slack_webhook, "/credentials/slack-webhook")
         self.assertEqual(args.update_go_modules, True)
         self.assertEqual(args.run_make, True)
+
+    def test_valid_cli_arguments_with_token(self):
+        args = cli.parse_cli_arguments(args_dict_to_list(valid_token_args))
+
+        self.assertEqual(
+            args.source.url, "https://opendev.org/openstack/kuryr-kubernetes"
+        )
+        self.assertEqual(args.source.branch, "master")
+        self.assertEqual(args.dest.ns, "openshift")
+        self.assertEqual(args.dest.name, "kuryr-kubernetes")
+        self.assertEqual(args.dest.branch, "master")
+        self.assertEqual(args.merge.ns, "shiftstack")
+        self.assertEqual(args.merge.name, "kuryr-kubernetes")
+        self.assertEqual(args.merge.branch, "merge-bot-master")
+        self.assertEqual(args.github_token, "/credentials/gh-token")
+        self.assertIsNone(args.github_app_key)
+        self.assertIsNone(args.github_cloner_key)
+
+    def test_missing_auth(self):
+        no_auth_args = {
+            "source": "https://opendev.org/openstack/kuryr-kubernetes:master",
+            "dest": "openshift/kuryr-kubernetes:master",
+            "merge": "shiftstack/kuryr-kubernetes:merge-bot-master",
+            "bot-name": "test",
+            "bot-email": "test@email.com",
+        }
+        with self.assertRaises(SystemExit):
+            cli.parse_cli_arguments(args_dict_to_list(no_auth_args))
 
     def test_invalid_branch(self):
         for branch in ("dest", "source", "merge"):

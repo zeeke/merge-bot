@@ -128,30 +128,42 @@ def parse_cli_arguments(testing_args=None):
         help="The working directory where the git repos will be cloned.",
         default=".",
     )
-    parser.add_argument(
+    auth_group = parser.add_argument_group(
+        "authentication",
+        "Either --github-token or both --github-app-key and "
+        "--github-cloner-key must be provided.",
+    )
+    auth_group.add_argument(
+        "--github-token",
+        type=str,
+        required=False,
+        help="The path to a file containing a GitHub Personal Access Token. "
+        "When provided, --github-app-key and --github-cloner-key are not required.",
+    )
+    auth_group.add_argument(
         "--github-app-id",
         type=int,
         required=False,
         help="The app ID of the GitHub app to use.",
         default=118774,  # shiftstack-merge-bot
     )
-    parser.add_argument(
+    auth_group.add_argument(
         "--github-app-key",
         type=str,
-        required=True,
+        required=False,
         help="The path to a github app private key.",
     )
-    parser.add_argument(
+    auth_group.add_argument(
         "--github-cloner-id",
         type=int,
         required=False,
         help="The app ID of the GitHub cloner app to use.",
         default=121614,  # shiftstack-merge-bot-cloner
     )
-    parser.add_argument(
+    auth_group.add_argument(
         "--github-cloner-key",
         type=str,
-        required=True,
+        required=False,
         help="The path to a github app private key.",
     )
     parser.add_argument(
@@ -180,17 +192,31 @@ def parse_cli_arguments(testing_args=None):
     else:
         args = parser.parse_args()
 
+    if not args.github_token and not (args.github_app_key and args.github_cloner_key):
+        parser.error(
+            "Either --github-token or both --github-app-key and "
+            "--github-cloner-key must be provided."
+        )
+
     return args
 
 
 def main():
     args = parse_cli_arguments()
 
-    with open(args.github_app_key, "r") as f:
-        gh_app_key = f.read().strip().encode()
+    gh_token = None
+    gh_app_key = None
+    gh_cloner_key = None
 
-    with open(args.github_cloner_key, "r") as f:
-        gh_cloner_key = f.read().strip().encode()
+    if args.github_token:
+        with open(args.github_token, "r") as f:
+            gh_token = f.read().strip()
+    else:
+        with open(args.github_app_key, "r") as f:
+            gh_app_key = f.read().strip().encode()
+
+        with open(args.github_cloner_key, "r") as f:
+            gh_cloner_key = f.read().strip().encode()
 
     slack_webhook = None
     if args.slack_webhook is not None:
@@ -211,6 +237,7 @@ def main():
         slack_webhook,
         update_go_modules=args.update_go_modules,
         run_make=args.run_make,
+        gh_token=gh_token,
     )
 
     if success:

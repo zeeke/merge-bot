@@ -302,6 +302,11 @@ def create_pr(g, dest_repo, dest, source, merge):
     return pr.json()["html_url"], True
 
 
+def github_token_login(token):
+    logging.info("Logging to GitHub with personal access token")
+    return github3.login(token=token)
+
+
 def github_app_login(gh_app_id, gh_app_key):
     logging.info("Logging to GitHub")
     g = github3.GitHub()
@@ -422,20 +427,27 @@ def run(
     slack_webhook,
     update_go_modules=False,
     run_make=False,
+    gh_token=None,
 ):
     logging.basicConfig(
         format="%(levelname)s - %(message)s", stream=sys.stdout, level=logging.INFO
     )
 
-    # App credentials for accessing the destination and opening a PR
-    gh_app = github_app_login(gh_app_id, gh_app_key)
-    gh_app = github_login_for_repo(gh_app, dest.ns, dest.name, gh_app_id, gh_app_key)
+    if gh_token:
+        gh_app = github_token_login(gh_token)
+        gh_cloner_app = github_token_login(gh_token)
+    else:
+        # App credentials for accessing the destination and opening a PR
+        gh_app = github_app_login(gh_app_id, gh_app_key)
+        gh_app = github_login_for_repo(
+            gh_app, dest.ns, dest.name, gh_app_id, gh_app_key
+        )
 
-    # App credentials for writing to the merge repo
-    gh_cloner_app = github_app_login(gh_cloner_id, gh_cloner_key)
-    gh_cloner_app = github_login_for_repo(
-        gh_cloner_app, merge.ns, merge.name, gh_cloner_id, gh_cloner_key
-    )
+        # App credentials for writing to the merge repo
+        gh_cloner_app = github_app_login(gh_cloner_id, gh_cloner_key)
+        gh_cloner_app = github_login_for_repo(
+            gh_cloner_app, merge.ns, merge.name, gh_cloner_id, gh_cloner_key
+        )
 
     try:
         dest_repo = gh_app.repository(dest.ns, dest.name)
