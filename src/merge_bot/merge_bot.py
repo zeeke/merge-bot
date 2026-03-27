@@ -112,7 +112,7 @@ def git_merge(gitwd, dest, source, merge):
 
     logging.info("Performing merge")
     try:
-        gitwd.git.merge(f"source/{source.branch}", "--no-commit")
+        gitwd.git.merge(f"source/{source.branch}", "-X", "ours")
     except git.exc.GitCommandError as ex:
         raise RepoException(f"Git merge failed: {ex}")
 
