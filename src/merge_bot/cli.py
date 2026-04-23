@@ -130,10 +130,10 @@ def parse_cli_arguments(testing_args=None):
     )
     parser.add_argument(
         "--github-app-id",
-        type=int,
+        type=str,
         required=False,
         help="The app ID of the GitHub app to use.",
-        default=118774,  # shiftstack-merge-bot
+        default="118774",  # shiftstack-merge-bot
     )
     parser.add_argument(
         "--github-app-key",
@@ -143,10 +143,10 @@ def parse_cli_arguments(testing_args=None):
     )
     parser.add_argument(
         "--github-cloner-id",
-        type=int,
+        type=str,
         required=False,
         help="The app ID of the GitHub cloner app to use.",
-        default=121614,  # shiftstack-merge-bot-cloner
+        default="121614",  # shiftstack-merge-bot-cloner
     )
     parser.add_argument(
         "--github-cloner-key",
