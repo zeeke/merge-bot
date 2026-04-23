@@ -428,14 +428,34 @@ def run(
     )
 
     # App credentials for accessing the destination and opening a PR
-    gh_app = github_app_login(gh_app_id, gh_app_key)
-    gh_app = github_login_for_repo(gh_app, dest.ns, dest.name, gh_app_id, gh_app_key)
+    try:
+        gh_app = github_app_login(gh_app_id, gh_app_key)
+        gh_app = github_login_for_repo(
+            gh_app, dest.ns, dest.name, gh_app_id, gh_app_key
+        )
+    except Exception as ex:
+        logging.exception(ex)
+        error_slack(
+            slack_webhook,
+            "An error occurred while logging in to GitHub",
+            ex,
+        )
+        return False
 
     # App credentials for writing to the merge repo
-    gh_cloner_app = github_app_login(gh_cloner_id, gh_cloner_key)
-    gh_cloner_app = github_login_for_repo(
-        gh_cloner_app, merge.ns, merge.name, gh_cloner_id, gh_cloner_key
-    )
+    try:
+        gh_cloner_app = github_app_login(gh_cloner_id, gh_cloner_key)
+        gh_cloner_app = github_login_for_repo(
+            gh_cloner_app, merge.ns, merge.name, gh_cloner_id, gh_cloner_key
+        )
+    except Exception as ex:
+        logging.exception(ex)
+        error_slack(
+            slack_webhook,
+            "An error occurred while logging in to GitHub",
+            ex,
+        )
+        return False
 
     try:
         dest_repo = gh_app.repository(dest.ns, dest.name)
