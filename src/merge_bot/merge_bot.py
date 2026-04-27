@@ -493,73 +493,19 @@ def run(
         )
         return False
 
-    try:
-        if not git_merge(gitwd, dest, source, merge):
-            return True
-
-        if update_go_modules:
-            commit_go_mod_updates(gitwd)
-
-        if run_make:
-            commit_run_make(gitwd)
-    except MakeException as ex:
-        # We don't want to fail the merge if make fails, but we should inform
-        # the user that they need to run make merge-bot manually and fix the
-        # issue.
-        logging.warning(ex)
-        pass
-    except RepoException as ex:
-        logging.error(ex)
-        try:
-            source = urllib.parse.urlparse(source).path.lstrip("/")
-        except Exception:
-            pass
-        error_slack(
-            slack_webhook,
-            f"Manual intervention is needed to merge {source} into {dest}",
-            ex,
-        )
+    
+    if not git_merge(gitwd, dest, source, merge):
         return True
-    except Exception as ex:
-        logging.exception(ex)
-        try:
-            source = urllib.parse.urlparse(source).path.lstrip("/")
-        except Exception:
-            pass
-        error_slack(
-            slack_webhook,
-            f"An error occurred trying to merge {source} into {dest}",
-            ex,
-        )
-        return False
 
-    try:
-        push_result = push(gitwd, merge)
-    except Exception as ex:
-        logging.exception(ex)
-        error_slack(
-            slack_webhook,
-            f"An error occurred pushing to {merge}",
-            ex,
-        )
-        return False
+    if update_go_modules:
+        commit_go_mod_updates(gitwd)
 
-    try:
-        pr_url, created = create_pr(gh_app, dest_repo, dest, source, merge)
-        logging.info(f"Merge PR is {pr_url}")
-    except Exception as ex:
-        logging.exception(ex)
-        error_slack(slack_webhook, "An error occurred creating a merge PR", ex)
-        return False
+    if run_make:
+        commit_run_make(gitwd)
+    
+    push_result = push(gitwd, merge)
 
-    if created:
-        message_slack(slack_webhook, f"A new merge PR was created: <{pr_url}>")
-    else:
-        if push_result:
-            message_slack(
-                slack_webhook, f"An existing merge PR was updated: <{pr_url}>"
-            )
-        else:
-            logging.info(f"No changes pushed to existing PR: <{pr_url}>")
-
+    pr_url, created = create_pr(gh_app, dest_repo, dest, source, merge)
+    logging.info(f"Merge PR is {pr_url}")
+    
     return True
