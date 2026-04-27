@@ -13,4 +13,6 @@ WORKDIR /src
 COPY . .
 RUN python -m pip install .
 
+WORKDIR /working
+
 ENTRYPOINT [ "/usr/local/bin/merge-bot" ]
