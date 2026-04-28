@@ -16,6 +16,7 @@ usage() {
 
 	Optional:
 	  --fork <owner/repo>         Fork to push the work branch to (defaults to --repo)
+	  --skip-pattern <regex>      Skip commits whose subject matches this grep regex
 	  --dry-run                   List commits that would be backported, then exit
 	  -h, --help                  Show this help message
 	EOF
@@ -26,6 +27,7 @@ SOURCE=""
 TARGET=""
 TOKEN_FILE=""
 FORK=""
+SKIP_PATTERN=""
 DRY_RUN=false
 
 while [[ $# -gt 0 ]]; do
@@ -35,6 +37,7 @@ while [[ $# -gt 0 ]]; do
 		--target)      TARGET="$2";       shift 2 ;;
 		--github-token) TOKEN_FILE="$2";  shift 2 ;;
 		--fork)        FORK="$2";         shift 2 ;;
+		--skip-pattern) SKIP_PATTERN="$2"; shift 2 ;;
 		--dry-run)     DRY_RUN=true;      shift   ;;
 		-h|--help)     usage; exit 0              ;;
 		*)             echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
@@ -72,6 +75,19 @@ mapfile -t COMMITS < <(
 		"origin/${TARGET}...origin/${SOURCE}" \
 	| tac
 )
+
+if [[ -n "$SKIP_PATTERN" ]]; then
+	FILTERED=()
+	for c in "${COMMITS[@]}"; do
+		subject=$(git log --pretty=tformat:%s -1 "$c")
+		if echo "$subject" | grep -qE "$SKIP_PATTERN"; then
+			echo "Skipping: $(git log --oneline -1 "$c")"
+		else
+			FILTERED+=("$c")
+		fi
+	done
+	COMMITS=("${FILTERED[@]+"${FILTERED[@]}"}")
+fi
 
 if [[ ${#COMMITS[@]} -eq 0 ]]; then
 	echo "No commits to backport — $SOURCE and $TARGET are in sync."
