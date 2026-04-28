@@ -294,6 +294,7 @@ def create_pr(g, dest_repo, dest, source, merge):
             "head": f"{merge.ns}:{merge.branch}",
             "base": dest.branch,
             "maintainer_can_modify": False,
+            "body": f"Sync PR from {source.url}:{source.branch}"
         },
         json=True,
     )
