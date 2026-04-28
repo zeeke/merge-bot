@@ -18,7 +18,7 @@ jobs:
             -v /tmp/gh.txt:/gh.txt \
             ghcr.io/zeeke/merge-bot:latest \
             --source https://github.com/openperouter/openperouter:main \
-            --dest zeeke/openperouter:main \
+            --dest openshift-kni/openperouter:main \
             --merge zeeke/openperouter:merge-bot-sync-main \
             --bot-name merge-sync-bot --bot-email merge-sync-bot@redhat.com \
             --github-token /gh.txt --update-go-modules
