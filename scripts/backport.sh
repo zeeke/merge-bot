@@ -76,25 +76,34 @@ else
 	git fetch origin "$SOURCE" "$TARGET"
 fi
 
-mapfile -t COMMITS < <(
+VERSION_NOISE='-4-22|-4-21|-5-0|4\.22|4\.21|5\.0|createdAt'
+
+mapfile -t ALL_COMMITS < <(
 	git log --cherry-pick --right-only --no-merges \
 		--pretty=tformat:%H \
 		"origin/${TARGET}...origin/${SOURCE}" \
 	| tac
 )
 
-if [[ -n "$SKIP_PATTERN" ]]; then
-	FILTERED=()
-	for c in "${COMMITS[@]}"; do
-		subject=$(git log --pretty=tformat:%s -1 "$c")
-		if echo "$subject" | grep -qE "$SKIP_PATTERN"; then
-			echo "Skipping: $(git log --oneline -1 "$c")"
-		else
-			FILTERED+=("$c")
-		fi
-	done
-	COMMITS=("${FILTERED[@]+"${FILTERED[@]}"}")
-fi
+COMMITS=()
+for c in "${ALL_COMMITS[@]}"; do
+	subject=$(git log --pretty=tformat:%s -1 "$c")
+
+	if [[ -n "$SKIP_PATTERN" ]] && echo "$subject" | grep -qE "$SKIP_PATTERN"; then
+		echo "Skipping (subject match): $(git log --oneline -1 "$c")"
+		continue
+	fi
+
+	meaningful=$(git diff "$c^" "$c" --unified=0 \
+		| grep '^[+-]' | grep -vE '^(\+\+\+|---)' \
+		| grep -cvE -- "$VERSION_NOISE" || true)
+	if [[ "$meaningful" -eq 0 ]]; then
+		echo "Skipping (version-only): $(git log --oneline -1 "$c")"
+		continue
+	fi
+
+	COMMITS+=("$c")
+done
 
 if [[ ${#COMMITS[@]} -eq 0 ]]; then
 	echo "No commits to backport — $SOURCE and $TARGET are in sync."
@@ -179,11 +188,11 @@ PR_HEAD="${FORK_OWNER}:${WORK_BRANCH}"
 
 echo "Creating pull request..."
 export GH_TOKEN="$TOKEN"
-# PR_URL=$(gh pr create \
-	# --repo "$REPO" \
-	# --base "$TARGET" \
-	# --head "$PR_HEAD" \
-	# --title "Backport $SOURCE to $TARGET" \
-	# --body "Automated backport of all commits from \`$SOURCE\` missing in \`$TARGET\`.")
+PR_URL=$(gh pr create \
+	--repo "$REPO" \
+	--base "$TARGET" \
+	--head "$PR_HEAD" \
+	--title "Backport $SOURCE to $TARGET" \
+	--body "Automated backport of all commits from \`$SOURCE\` missing in \`$TARGET\`.")
 
 echo "Pull request created: $PR_URL"
