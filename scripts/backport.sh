@@ -131,26 +131,25 @@ for c in "${COMMITS[@]}"; do
 	fi
 	echo "Cherry-picking $(git log --oneline -1 "$c")..."
 	if ! git cherry-pick "$c"; then
-		mapfile -t CONFLICTED < <(git diff --name-only --diff-filter=U)
+		CONFLICTED=$(git diff --name-only --diff-filter=U)
+		COMMIT_MSG=$(git log --pretty=tformat:%s -1 "$c")
+		echo "Conflicts detected, asking Claude to resolve..."
+		claude -p "You are resolving git cherry-pick conflicts during a backport from branch '$SOURCE' to '$TARGET'.
+The commit being cherry-picked is: $COMMIT_MSG ($c)
 
-		for f in "${CONFLICTED[@]}"; do
-			if [[ "$f" == *clusterserviceversion* ]]; then
-				echo "Auto-resolving $f (keeping ours)..."
-				git checkout --ours -- "$f"
-				git add -- "$f"
-			fi
-		done
+The following files have conflicts:
+$CONFLICTED
 
-		REMAINING=$(git diff --name-only --diff-filter=U)
-		if [[ -n "$REMAINING" ]]; then
-			echo "" >&2
-			echo "Cherry-pick conflict on commit $c" >&2
-			echo "Remaining conflicts:" >&2
-			echo "$REMAINING" >&2
-			echo "" >&2
-			echo "  cd $(pwd)" >&2
-			echo "  # fix conflicts, then: git cherry-pick --continue" >&2
-			echo "  # re-run this script to continue from where it left off" >&2
+Rules:
+- For clusterserviceversion files pick our version of the 'createAt' field (the $TARGET branch side).
+- For all other files, resolve the conflicts intelligently by understanding the intent of the cherry-picked commit and preserving it while keeping it compatible with the target branch.
+- Edit each conflicted file to remove all conflict markers (<<<<<<< HEAD, =======, >>>>>>> ...) and produce a valid, working file.
+- After editing, run 'git add' on each resolved file.
+- Do NOT run 'git cherry-pick --continue' or '--skip', just resolve and stage." --allowedTools 'Bash(git:*)' 'Edit' 'Read'
+
+		if git diff --name-only --diff-filter=U | grep -q .; then
+			echo "Error: Claude could not resolve all conflicts." >&2
+			echo "Resolve manually in: $(pwd)" >&2
 			exit 1
 		fi
 
