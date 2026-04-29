@@ -131,14 +131,35 @@ for c in "${COMMITS[@]}"; do
 	fi
 	echo "Cherry-picking $(git log --oneline -1 "$c")..."
 	if ! git cherry-pick "$c"; then
-		echo "" >&2
-		echo "Cherry-pick conflict on commit $c" >&2
-		echo "Resolve it manually in: $(pwd)" >&2
-		echo "" >&2
-		echo "  cd $(pwd)" >&2
-		echo "  # fix conflicts, then: git cherry-pick --continue" >&2
-		echo "  # re-run this script to continue from where it left off" >&2
-		exit 1
+		mapfile -t CONFLICTED < <(git diff --name-only --diff-filter=U)
+
+		for f in "${CONFLICTED[@]}"; do
+			if [[ "$f" == *clusterserviceversion* ]]; then
+				echo "Auto-resolving $f (keeping ours)..."
+				git checkout --ours -- "$f"
+				git add -- "$f"
+			fi
+		done
+
+		REMAINING=$(git diff --name-only --diff-filter=U)
+		if [[ -n "$REMAINING" ]]; then
+			echo "" >&2
+			echo "Cherry-pick conflict on commit $c" >&2
+			echo "Remaining conflicts:" >&2
+			echo "$REMAINING" >&2
+			echo "" >&2
+			echo "  cd $(pwd)" >&2
+			echo "  # fix conflicts, then: git cherry-pick --continue" >&2
+			echo "  # re-run this script to continue from where it left off" >&2
+			exit 1
+		fi
+
+		if git diff --cached --quiet; then
+			echo "No changes after resolving conflicts, skipping commit."
+			git cherry-pick --skip
+		else
+			GIT_EDITOR=true git cherry-pick --continue
+		fi
 	fi
 done
 
