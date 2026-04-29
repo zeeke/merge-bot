@@ -58,16 +58,23 @@ fi
 TOKEN=$(cat "$TOKEN_FILE")
 FORK="${FORK:-$REPO}"
 
-WORKDIR=$(mktemp -d)
-trap 'rm -rf "$WORKDIR"' EXIT
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+WORKDIR="${SCRIPT_DIR}/../.backport-work/${REPO}"
 
-echo "Cloning $REPO into $WORKDIR..."
-git clone --no-tags \
-	"https://x-access-token:${TOKEN}@github.com/${REPO}.git" \
-	"$WORKDIR/repo"
-cd "$WORKDIR/repo"
-
-git fetch origin "$SOURCE" "$TARGET"
+if [[ -d "$WORKDIR/repo/.git" ]]; then
+	echo "Reusing existing clone in $WORKDIR..."
+	cd "$WORKDIR/repo"
+	git fetch origin "$SOURCE" "$TARGET"
+else
+	rm -rf "$WORKDIR"
+	mkdir -p "$WORKDIR"
+	echo "Cloning $REPO into $WORKDIR..."
+	git clone --no-tags \
+		"https://x-access-token:${TOKEN}@github.com/${REPO}.git" \
+		"$WORKDIR/repo"
+	cd "$WORKDIR/repo"
+	git fetch origin "$SOURCE" "$TARGET"
+fi
 
 mapfile -t COMMITS < <(
 	git log --cherry-pick --right-only --no-merges \
@@ -105,20 +112,40 @@ if $DRY_RUN; then
 fi
 
 WORK_BRANCH="backport/${SOURCE}-to-${TARGET}"
-git checkout -b "$WORK_BRANCH" "origin/${TARGET}"
+if git show-ref --verify --quiet "refs/heads/$WORK_BRANCH"; then
+	echo "Resuming existing branch $WORK_BRANCH..."
+	git checkout "$WORK_BRANCH"
+else
+	git checkout -b "$WORK_BRANCH" "origin/${TARGET}"
+fi
+
+declare -A STILL_NEEDED
+while IFS= read -r h; do
+	STILL_NEEDED[$h]=1
+done < <(git log --cherry-pick --right-only --no-merges --pretty=tformat:%H "HEAD...origin/${SOURCE}")
 
 for c in "${COMMITS[@]}"; do
+	if [[ -z "${STILL_NEEDED[$c]:-}" ]]; then
+		echo "Already picked: $(git log --oneline -1 "$c")"
+		continue
+	fi
 	echo "Cherry-picking $(git log --oneline -1 "$c")..."
 	if ! git cherry-pick "$c"; then
-		echo "Error: cherry-pick failed on commit $c" >&2
-		echo "Aborting." >&2
-		git cherry-pick --abort 2>/dev/null || true
+		echo "" >&2
+		echo "Cherry-pick conflict on commit $c" >&2
+		echo "Resolve it manually in: $(pwd)" >&2
+		echo "" >&2
+		echo "  cd $(pwd)" >&2
+		echo "  # fix conflicts, then: git cherry-pick --continue" >&2
+		echo "  # re-run this script to continue from where it left off" >&2
 		exit 1
 	fi
 done
 
 if [[ "$FORK" != "$REPO" ]]; then
-	git remote add fork "https://x-access-token:${TOKEN}@github.com/${FORK}.git"
+	if ! git remote get-url fork &>/dev/null; then
+		git remote add fork "https://x-access-token:${TOKEN}@github.com/${FORK}.git"
+	fi
 	PUSH_REMOTE=fork
 else
 	PUSH_REMOTE=origin
@@ -132,11 +159,11 @@ PR_HEAD="${FORK_OWNER}:${WORK_BRANCH}"
 
 echo "Creating pull request..."
 export GH_TOKEN="$TOKEN"
-PR_URL=$(gh pr create \
-	--repo "$REPO" \
-	--base "$TARGET" \
-	--head "$PR_HEAD" \
-	--title "Backport $SOURCE to $TARGET" \
-	--body "Automated backport of all commits from \`$SOURCE\` missing in \`$TARGET\`.")
+# PR_URL=$(gh pr create \
+	# --repo "$REPO" \
+	# --base "$TARGET" \
+	# --head "$PR_HEAD" \
+	# --title "Backport $SOURCE to $TARGET" \
+	# --body "Automated backport of all commits from \`$SOURCE\` missing in \`$TARGET\`.")
 
 echo "Pull request created: $PR_URL"
